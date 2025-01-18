@@ -1,8 +1,9 @@
 import { Plugin } from "obsidian";
 import { format } from "prettier";
 import * as babelPlugin from "prettier/plugins/babel";
-import * as typescriptPlugin from "prettier/plugins/typescript";
 import * as prettierPluginEstree from "prettier/plugins/estree";
+import * as typescriptPlugin from "prettier/plugins/typescript";
+import * as htmlPlugin from "prettier/plugins/html";
 
 interface MyPluginSettings {
 	mySetting: string;
@@ -12,12 +13,53 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 	mySetting: "default",
 };
 
-const plugins = [babelPlugin, typescriptPlugin, prettierPluginEstree];
+const plugins = [babelPlugin, typescriptPlugin, prettierPluginEstree, htmlPlugin];
 
-const formatCode = (code: string) => {
+const langMap = {
+	js: "typescript",
+	javascript: "typescript",
+	ts: "typescript",
+	typescript: "typescript",
+	// json: "json",
+	html: "html",
+	// css: "css",
+	// scss: "scss",
+	// less: "less",
+	// markdown: "markdown",
+	// md: "markdown",
+	// yaml: "yaml",
+	// yml: "yaml",
+	// "graphql": "graphql",
+	// vue: "vue",
+	// "angular": "angular",
+	// "json5": "json5",
+	// "toml": "toml",
+	// "lua": "lua",
+	// "python": "python",
+	// "ruby": "ruby",
+	// "bash": "bash",
+	// "sh": "bash",
+	// "php": "php",
+	// "java": "java",
+	// "c": "c",
+	// "cpp": "c++",
+	// "c++": "c++",
+	// "go": "go",
+	// "haskell": "haskell",
+	// "kotlin": "kotlin"
+};
+
+const langs = Object.keys(langMap);
+
+const formatCode = (code: string, lang: string) => {
+	console.log("formatCode", lang);
+	if (!langs.includes(lang)) {
+		return Promise.resolve(code);
+	}
+
 	return format(code, {
 		semi: false,
-		parser: "typescript",
+		parser: langMap[lang as keyof typeof langMap],
 		plugins,
 	});
 };
@@ -37,14 +79,18 @@ export default class MyPlugin extends Plugin {
 				let flag = false;
 				let temp = "";
 				let start = Number.NaN;
+				let lang = "";
 				const promises = [];
 
 				for (let i = 0; i < doc.lineCount(); i++) {
 					const line = doc.getLine(i);
-					if (line.trim().startsWith("```")) {
+					const reg = /\s*```([a-zA-Z]*)/;
+
+					if (reg.test(line)) {
 						flag = !flag;
 						if (flag) {
 							start = i;
+							lang = line.match(reg)?.[1] || "";
 							continue;
 						}
 
@@ -55,7 +101,7 @@ export default class MyPlugin extends Plugin {
 									end: i,
 								};
 
-								formatCode(temp).then((res) => {
+								formatCode(temp, lang).then((res) => {
 									resolve({ ...index, code: res });
 								});
 							});
