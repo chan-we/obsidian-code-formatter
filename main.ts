@@ -37,6 +37,8 @@ export default class MyPlugin extends Plugin {
 				let flag = false;
 				let temp = "";
 				let start = Number.NaN;
+				const promises = [];
+
 				for (let i = 0; i < doc.lineCount(); i++) {
 					const line = doc.getLine(i);
 					if (line.trim().startsWith("```")) {
@@ -47,15 +49,21 @@ export default class MyPlugin extends Plugin {
 						}
 
 						if (!Number.isNaN(start)) {
-							formatCode(temp).then((res) => {
-								doc.replaceRange(
-									res,
-									{ line: start + 1, ch: 0 },
-									{ line: i, ch: 0 },
-								);
-								temp = "";
-								start = Number.NaN;
+							const p = new Promise((resolve) => {
+								const index = {
+									start: start + 1,
+									end: i,
+								};
+
+								formatCode(temp).then((res) => {
+									resolve({ ...index, code: res });
+								});
 							});
+
+							promises.push(p);
+
+							temp = "";
+							start = Number.NaN;
 						}
 
 						continue;
@@ -65,6 +73,21 @@ export default class MyPlugin extends Plugin {
 						temp += line + "\n";
 					}
 				}
+				let offset = 0;
+				Promise.all(promises).then(
+					(res: { code: string; start: number; end: number }[]) => {
+						res.forEach(({ code, start, end }) => {
+							doc.replaceRange(
+								code,
+								{ line: start + offset, ch: 0 },
+								{ line: end + offset, ch: 0 },
+							);
+
+							offset +=
+								code.split("\n").length - 1 - (end - start);
+						});
+					},
+				);
 			},
 		});
 	}
