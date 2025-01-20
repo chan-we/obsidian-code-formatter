@@ -11,3 +11,13 @@ Currently support these languages:
 - JSON
 - YAML
 
+# How to use
+First active an editor.
+
+Then there are multiple ways to use this plugin.
+
+- Click the sidebar icon button
+![](/assets/imgs/image.png)
+
+- Or type <kbd>command</kbd> + <kbd>P</kbd> to use command `Format Code`
+![](/assets/imgs/image2.png)

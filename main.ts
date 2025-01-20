@@ -1,4 +1,4 @@
-import { Plugin, Notice } from "obsidian";
+import { Plugin, Notice, MarkdownView, Editor } from "obsidian";
 import { format } from "prettier";
 import * as babelPlugin from "prettier/plugins/babel";
 import * as prettierPluginEstree from "prettier/plugins/estree";
@@ -21,7 +21,7 @@ const plugins = [
 	prettierPluginEstree,
 	htmlPlugin,
 	postcssPlugin,
-	yamlPlugin
+	yamlPlugin,
 ];
 
 const langMap = {
@@ -76,100 +76,113 @@ const formatCode = (code: string, lang: string) => {
 	});
 };
 
+const formatEditorCodes = (editor: Editor) => {
+	const doc = editor.getDoc();
+
+	let flag = false;
+	let temp = "";
+	let start = Number.NaN;
+	let lang = "";
+	const promises = [];
+
+	for (let i = 0; i < doc.lineCount(); i++) {
+		const line = doc.getLine(i);
+		const reg = /\s*```([a-zA-Z]*)/;
+
+		if (reg.test(line)) {
+			flag = !flag;
+			if (flag) {
+				start = i;
+				lang = line.match(reg)?.[1] || "";
+				continue;
+			}
+
+			if (!Number.isNaN(start)) {
+				const p = new Promise((resolve, reject) => {
+					const index = {
+						start: start + 1,
+						end: i,
+					};
+
+					formatCode(temp, lang)
+						.then((res) => {
+							resolve({ ...index, code: res });
+						})
+						.catch((e) => {
+							reject(e);
+						});
+				});
+
+				promises.push(p);
+
+				temp = "";
+				start = Number.NaN;
+			}
+
+			continue;
+		}
+
+		if (flag) {
+			temp += line + "\n";
+		}
+	}
+	let offset = 0;
+	Promise.allSettled(promises).then(
+		(
+			res: PromiseSettledResult<{
+				code: string;
+				start: number;
+				end: number;
+			}>[],
+		) => {
+			let fulfilledCount = 0;
+			let rejectedCount = 0;
+
+			res.forEach((item) => {
+				if (item.status === "fulfilled") {
+					const { code, start, end } = item.value;
+					doc.replaceRange(
+						code,
+						{ line: start + offset, ch: 0 },
+						{ line: end + offset, ch: 0 },
+					);
+
+					offset += code.split("\n").length - 1 - (end - start);
+					fulfilledCount += 1;
+				} else {
+					console.error(item.reason);
+					rejectedCount += 1;
+				}
+			});
+
+			new Notice(
+				`Formatting succeeded in ${fulfilledCount} place(s) and failed in ${rejectedCount} place(s).`,
+			);
+		},
+	);
+};
+
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
 
 	async onload() {
 		await this.loadSettings();
 
+		this.addRibbonIcon("ruler", "Format Code", () => {
+			const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+			const editor = view?.editor;
+			if (editor) {
+				formatEditorCodes(editor);
+			} else {
+				console.warn("No editor");
+			}
+		});
+
 		this.addCommand({
 			id: "format-code",
 			name: "Format Code",
-			editorCallback(editor, ctx) {
-				const doc = editor.getDoc();
-
-				let flag = false;
-				let temp = "";
-				let start = Number.NaN;
-				let lang = "";
-				const promises = [];
-
-				for (let i = 0; i < doc.lineCount(); i++) {
-					const line = doc.getLine(i);
-					const reg = /\s*```([a-zA-Z]*)/;
-
-					if (reg.test(line)) {
-						flag = !flag;
-						if (flag) {
-							start = i;
-							lang = line.match(reg)?.[1] || "";
-							continue;
-						}
-
-						if (!Number.isNaN(start)) {
-							const p = new Promise((resolve, reject) => {
-								const index = {
-									start: start + 1,
-									end: i,
-								};
-
-								formatCode(temp, lang)
-									.then((res) => {
-										resolve({ ...index, code: res });
-									})
-									.catch((e) => {
-										reject(e);
-									});
-							});
-
-							promises.push(p);
-
-							temp = "";
-							start = Number.NaN;
-						}
-
-						continue;
-					}
-
-					if (flag) {
-						temp += line + "\n";
-					}
-				}
-				let offset = 0;
-				Promise.allSettled(promises).then(
-					(
-						res: PromiseSettledResult<{
-							code: string;
-							start: number;
-							end: number;
-						}>[],
-					) => {
-						let fulfilledCount = 0;
-						let rejectedCount = 0;
-
-						res.forEach((item) => {
-							if (item.status === "fulfilled") {
-								const { code, start, end } = item.value;
-								doc.replaceRange(
-									code,
-									{ line: start + offset, ch: 0 },
-									{ line: end + offset, ch: 0 },
-								);
-
-								offset +=
-									code.split("\n").length - 1 - (end - start);
-								fulfilledCount += 1;
-							} else {
-								console.error(item.reason);
-								rejectedCount += 1;
-							}
-						});
-
-						new Notice(
-							`Formatting succeeded in ${fulfilledCount} place(s) and failed in ${rejectedCount} place(s).`,
-						);
-					},
-				);
+			editorCallback(editor) {
+				formatEditorCodes(editor);
 			},
 		});
 	}
