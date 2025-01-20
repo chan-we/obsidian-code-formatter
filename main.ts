@@ -1,4 +1,4 @@
-import { Plugin } from "obsidian";
+import { Plugin, Notice } from "obsidian";
 import { format } from "prettier";
 import * as babelPlugin from "prettier/plugins/babel";
 import * as prettierPluginEstree from "prettier/plugins/estree";
@@ -13,7 +13,12 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 	mySetting: "default",
 };
 
-const plugins = [babelPlugin, typescriptPlugin, prettierPluginEstree, htmlPlugin];
+const plugins = [
+	babelPlugin,
+	typescriptPlugin,
+	prettierPluginEstree,
+	htmlPlugin,
+];
 
 const langMap = {
 	js: "typescript",
@@ -95,15 +100,19 @@ export default class MyPlugin extends Plugin {
 						}
 
 						if (!Number.isNaN(start)) {
-							const p = new Promise((resolve) => {
+							const p = new Promise((resolve, reject) => {
 								const index = {
 									start: start + 1,
 									end: i,
 								};
 
-								formatCode(temp, lang).then((res) => {
-									resolve({ ...index, code: res });
-								});
+								formatCode(temp, lang)
+									.then((res) => {
+										resolve({ ...index, code: res });
+									})
+									.catch((e) => {
+										reject(e);
+									});
 							});
 
 							promises.push(p);
@@ -120,18 +129,38 @@ export default class MyPlugin extends Plugin {
 					}
 				}
 				let offset = 0;
-				Promise.all(promises).then(
-					(res: { code: string; start: number; end: number }[]) => {
-						res.forEach(({ code, start, end }) => {
-							doc.replaceRange(
-								code,
-								{ line: start + offset, ch: 0 },
-								{ line: end + offset, ch: 0 },
-							);
+				Promise.allSettled(promises).then(
+					(
+						res: PromiseSettledResult<{
+							code: string;
+							start: number;
+							end: number;
+						}>[],
+					) => {
+						let fulfilledCount = 0;
+						let rejectedCount = 0;
 
-							offset +=
-								code.split("\n").length - 1 - (end - start);
+						res.forEach((item) => {
+							if (item.status === "fulfilled") {
+								const { code, start, end } = item.value;
+
+								doc.replaceRange(
+									code,
+									{ line: start + offset, ch: 0 },
+									{ line: end + offset, ch: 0 },
+								);
+
+								offset +=
+									code.split("\n").length - 1 - (end - start);
+								fulfilledCount += 1;
+							} else {
+								rejectedCount += 1;
+							}
 						});
+
+						new Notice(
+							`Formatting succeeded in ${fulfilledCount} place(s) and failed in ${rejectedCount} place(s).`,
+						);
 					},
 				);
 			},
