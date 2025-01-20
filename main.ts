@@ -4,6 +4,8 @@ import * as babelPlugin from "prettier/plugins/babel";
 import * as prettierPluginEstree from "prettier/plugins/estree";
 import * as typescriptPlugin from "prettier/plugins/typescript";
 import * as htmlPlugin from "prettier/plugins/html";
+import * as postcssPlugin from "prettier/plugins/postcss";
+import * as yamlPlugin from "prettier/plugins/yaml";
 
 interface MyPluginSettings {
 	mySetting: string;
@@ -18,6 +20,8 @@ const plugins = [
 	typescriptPlugin,
 	prettierPluginEstree,
 	htmlPlugin,
+	postcssPlugin,
+	yamlPlugin
 ];
 
 const langMap = {
@@ -25,15 +29,18 @@ const langMap = {
 	javascript: "typescript",
 	ts: "typescript",
 	typescript: "typescript",
-	// json: "json",
+	json: "json",
 	html: "html",
-	// css: "css",
-	// scss: "scss",
-	// less: "less",
+	css: "css",
+	scss: "scss",
+	// sass: "scss", // due to unknown error, `sass` is not supported at this version.
+	less: "less",
 	// markdown: "markdown",
 	// md: "markdown",
-	// yaml: "yaml",
-	// yml: "yaml",
+	yaml: "yaml",
+	yml: "yaml",
+	jsx: "typescript",
+	tsx: "typescript",
 	// "graphql": "graphql",
 	// vue: "vue",
 	// "angular": "angular",
@@ -59,7 +66,7 @@ const langs = Object.keys(langMap);
 const formatCode = (code: string, lang: string) => {
 	console.log("formatCode", lang);
 	if (!langs.includes(lang)) {
-		return Promise.resolve(code);
+		return Promise.reject(new Error(`Language "${lang}" is not supported`));
 	}
 
 	return format(code, {
@@ -143,7 +150,6 @@ export default class MyPlugin extends Plugin {
 						res.forEach((item) => {
 							if (item.status === "fulfilled") {
 								const { code, start, end } = item.value;
-
 								doc.replaceRange(
 									code,
 									{ line: start + offset, ch: 0 },
@@ -154,6 +160,7 @@ export default class MyPlugin extends Plugin {
 									code.split("\n").length - 1 - (end - start);
 								fulfilledCount += 1;
 							} else {
+								console.error(item.reason);
 								rejectedCount += 1;
 							}
 						});
