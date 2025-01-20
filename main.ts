@@ -11,10 +11,6 @@ interface MyPluginSettings {
 	mySetting: string;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: "default",
-};
-
 const plugins = [
 	babelPlugin,
 	typescriptPlugin,
@@ -166,8 +162,6 @@ export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
 
 	async onload() {
-		await this.loadSettings();
-
 		this.addRibbonIcon("ruler", "Format Code", () => {
 			const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 			const editor = view?.editor;
@@ -188,16 +182,4 @@ export default class MyPlugin extends Plugin {
 	}
 
 	onunload() {}
-
-	async loadSettings() {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			await this.loadData(),
-		);
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
 }

@@ -4,6 +4,6 @@
 	"version": "0.0.1",
 	"minAppVersion": "0.15.0",
 	"description": "An Obsidian plugin for formatting code in editor (use prettier)",
-	"author": "Obsidian",
-	"isDesktopOnly": false
+	"author": "乌石",
+	"isDesktopOnly": true
 }
